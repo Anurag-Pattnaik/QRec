@@ -1,1134 +1,698 @@
-class QuestionRecorder {
+// Application State Management
+class QRecApp {
     constructor() {
+        this.currentView = 'dashboard';
         this.currentTopic = null;
-        this.topics = {};
-        this.mediaRecorder = null;
-        this.audioChunks = [];
-        this.currentRecording = null;
-        this.editingQuestionIndex = null;
-        this.microphonePermission = null;
-        this.currentTheme = localStorage.getItem('qrec-theme') || 'dark';
-        this.recordingTimers = new Map(); // Store recording timers for each card
-        this.audioContexts = new Map(); // Store audio contexts for frequency analysis
-        this.analyserNodes = new Map(); // Store analyser nodes for frequency visualization
-
-        // Only these 10 CS topics with specific color schemes
-        this.defaultTopicsData = {
-            dm: {
-                name: "Discrete Mathematics",
-                color: "bg-purple",
-                questions: [
-                    {"notes": "", "shorthand": "Set Theory", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Relations & Functions", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Graph Theory", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Logic & Proofs", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Combinatorics", "hasImage": false, "hasAudio": false}
-                ]
-            },
-            em: {
-                name: "Engineering Mathematics",
-                color: "bg-blue",
-                questions: [
-                    {"notes": "", "shorthand": "Linear Algebra", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Calculus", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Differential Equations", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Probability & Statistics", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Complex Analysis", "hasImage": false, "hasAudio": false}
-                ]
-            },
-            toc: {
-                name: "Theory of Computation",
-                color: "bg-green",
-                questions: [
-                    {"notes": "", "shorthand": "Finite Automata", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Context-Free Grammar", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Turing Machine", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Decidability", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Complexity Classes", "hasImage": false, "hasAudio": false}
-                ]
-            },
-            cd: {
-                name: "Compiler Design",
-                color: "bg-orange",
-                questions: [
-                    {"notes": "", "shorthand": "Lexical Analysis", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Syntax Analysis", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Semantic Analysis", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Code Generation", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Code Optimization", "hasImage": false, "hasAudio": false}
-                ]
-            },
-            coa: {
-                name: "Computer Organization",
-                color: "bg-teal",
-                questions: [
-                    {"notes": "", "shorthand": "Instruction Set Architecture", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "CPU Design & Control", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Memory Hierarchy", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "I/O Systems", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Pipeline & Hazards", "hasImage": false, "hasAudio": false}
-                ]
-            },
-            os: {
-                name: "Operating Systems",
-                color: "bg-red",
-                questions: [
-                    {"notes": "", "shorthand": "Process Management", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Memory Management", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "File Systems", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Synchronization", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Deadlock Prevention", "hasImage": false, "hasAudio": false}
-                ]
-            },
-            cn: {
-                name: "Computer Networks",
-                color: "bg-indigo",
-                questions: [
-                    {"notes": "", "shorthand": "OSI & TCP/IP Model", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "TCP/UDP Protocols", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Routing Algorithms", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Network Security", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Error Detection & Correction", "hasImage": false, "hasAudio": false}
-                ]
-            },
-            ds: {
-                name: "Data Structures",
-                color: "bg-pink",
-                questions: [
-                    {"notes": "", "shorthand": "Arrays & Linked Lists", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Stacks & Queues", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Trees & BST", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Graphs & Traversal", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Hash Tables", "hasImage": false, "hasAudio": false}
-                ]
-            },
-            algo: {
-                name: "Algorithms",
-                color: "bg-yellow",
-                questions: [
-                    {"notes": "", "shorthand": "Sorting Algorithms", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Divide & Conquer", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Dynamic Programming", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Greedy Algorithms", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Graph Algorithms", "hasImage": false, "hasAudio": false}
-                ]
-            },
-            dbms: {
-                name: "Database Management",
-                color: "bg-cyan",
-                questions: [
-                    {"notes": "", "shorthand": "ER Diagrams & Modeling", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Normalization", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "SQL Queries & Joins", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Transactions & ACID", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Indexing & Query Optimization", "hasImage": false, "hasAudio": false}
-                ]
-            }
-        };
-
-        // Default template for new custom topics
-        this.defaultQuestionTemplate = [
-            {"notes": "", "shorthand": "Key Concepts", "hasImage": false, "hasAudio": false},
-            {"notes": "", "shorthand": "Practice Problems", "hasImage": false, "hasAudio": false},
-            {"notes": "", "shorthand": "Real-world Applications", "hasImage": false, "hasAudio": false},
-            {"notes": "", "shorthand": "Common Mistakes", "hasImage": false, "hasAudio": false},
-            {"notes": "", "shorthand": "Summary & Formulas", "hasImage": false, "hasAudio": false}
-        ];
+        this.data = this.loadData();
+        this.theme = localStorage.getItem('qrec-theme') || 'dark';
+        this.init();
     }
 
     init() {
-        try {
-            console.log('Initializing Question Recorder...');
-            this.loadData();
-            this.setupEventListeners();
-            this.initTheme();
-            this.renderDashboard();
-            this.hideLoading();
-            console.log('Question Recorder initialized successfully');
-        } catch (error) {
-            console.error('Error initializing app:', error);
-            this.showError('Failed to initialize application: ' + error.message);
-        }
+        this.initTheme();
+        this.bindEvents();
+        this.renderDashboard();
     }
 
     initTheme() {
-        document.body.setAttribute('data-color-scheme', this.currentTheme);
+        document.documentElement.setAttribute('data-color-scheme', this.theme);
         const themeIcon = document.querySelector('.theme-icon');
-        if (themeIcon) {
-            themeIcon.textContent = this.currentTheme === 'dark' ? '☀️' : '🌙';
-        }
-    }
-
-    toggleTheme() {
-        this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
-        localStorage.setItem('qrec-theme', this.currentTheme);
-        this.initTheme();
+        themeIcon.textContent = this.theme === 'dark' ? '☀️' : '🌙';
     }
 
     loadData() {
-        try {
-            const stored = localStorage.getItem('questionRecorderData');
-            if (stored) {
-                const parsedData = JSON.parse(stored);
-                // Filter to only include our 10 defined topics
-                this.topics = {};
-                Object.keys(this.defaultTopicsData).forEach(topicId => {
-                    if (parsedData[topicId]) {
-                        this.topics[topicId] = parsedData[topicId];
-                    }
-                });
-                console.log('Loaded topics from localStorage:', Object.keys(this.topics));
-                
-                // Ensure all default topics exist
-                this.ensureDefaultTopics();
-            } else {
-                console.log('No stored data found, loading default topics');
-                this.loadDefaultTopics();
+        const stored = localStorage.getItem('qrec-data');
+        if (stored) {
+            return JSON.parse(stored);
+        }
+        
+        // Initialize with default data
+        const defaultData = {
+            "dm": {
+                "id": "dm",
+                "name": "Discrete Mathematics",
+                "color": "#8B5CF6",
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "Set Theory", "notes": "Basic concepts of sets, unions, intersections", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Relations & Functions", "notes": "Types of relations and function properties", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Graph Theory", "notes": "Vertices, edges, paths, and graph algorithms", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Logic & Proofs", "notes": "Propositional logic and proof techniques", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Combinatorics", "notes": "Counting principles and permutations", "audio": null, "audioDuration": 0}
+                ]
+            },
+            "em": {
+                "id": "em", 
+                "name": "Engineering Mathematics",
+                "color": "#3B82F6",
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "Linear Algebra", "notes": "Matrices, determinants, eigenvalues", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Calculus", "notes": "Limits, derivatives, and integrals", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Differential Equations", "notes": "ODE and PDE solving techniques", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Probability & Statistics", "notes": "Distributions and statistical inference", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Complex Analysis", "notes": "Complex functions and contour integration", "audio": null, "audioDuration": 0}
+                ]
+            },
+            "toc": {
+                "id": "toc",
+                "name": "Theory of Computation", 
+                "color": "#10B981",
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "Finite Automata", "notes": "DFA, NFA, and regular languages", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Context-Free Grammar", "notes": "CFG, PDA, and parsing techniques", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Turing Machine", "notes": "TM models and computability", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Decidability", "notes": "Decidable and undecidable problems", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Complexity Classes", "notes": "P, NP, and complexity theory", "audio": null, "audioDuration": 0}
+                ]
+            },
+            "cd": {
+                "id": "cd",
+                "name": "Compiler Design",
+                "color": "#F97316", 
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "Lexical Analysis", "notes": "Tokenization and lexer design", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Syntax Analysis", "notes": "Parsing and syntax trees", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Semantic Analysis", "notes": "Type checking and symbol tables", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Code Generation", "notes": "Intermediate and target code generation", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Code Optimization", "notes": "Optimization techniques and algorithms", "audio": null, "audioDuration": 0}
+                ]
+            },
+            "coa": {
+                "id": "coa",
+                "name": "Computer Organization",
+                "color": "#14B8A6",
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "Instruction Set Architecture", "notes": "RISC vs CISC, instruction formats", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "CPU Design & Control", "notes": "Control unit and datapath design", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Memory Hierarchy", "notes": "Cache, main memory, virtual memory", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "I/O Systems", "notes": "Input/output interfaces and DMA", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Pipeline & Hazards", "notes": "Pipelining and hazard resolution", "audio": null, "audioDuration": 0}
+                ]
+            },
+            "os": {
+                "id": "os",
+                "name": "Operating Systems",
+                "color": "#EF4444",
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "Process Management", "notes": "Process states, scheduling algorithms", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Memory Management", "notes": "Paging, segmentation, virtual memory", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "File Systems", "notes": "File allocation and directory structures", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Synchronization", "notes": "Semaphores, monitors, critical sections", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Deadlock Prevention", "notes": "Deadlock detection and prevention", "audio": null, "audioDuration": 0}
+                ]
+            },
+            "cn": {
+                "id": "cn", 
+                "name": "Computer Networks",
+                "color": "#6366F1",
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "OSI & TCP/IP Model", "notes": "Network protocol stack layers", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "TCP/UDP Protocols", "notes": "Reliable vs unreliable transport", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Routing Algorithms", "notes": "Distance vector and link state", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Network Security", "notes": "Encryption, authentication, firewalls", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Error Detection & Correction", "notes": "CRC, hamming codes, ARQ", "audio": null, "audioDuration": 0}
+                ]
+            },
+            "ds": {
+                "id": "ds",
+                "name": "Data Structures", 
+                "color": "#EC4899",
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "Arrays & Linked Lists", "notes": "Linear data structure operations", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Stacks & Queues", "notes": "LIFO and FIFO data structures", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Trees & BST", "notes": "Binary trees and search operations", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Graphs & Traversal", "notes": "Graph representation and traversal", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Hash Tables", "notes": "Hashing techniques and collision resolution", "audio": null, "audioDuration": 0}
+                ]
+            },
+            "algo": {
+                "id": "algo",
+                "name": "Algorithms",
+                "color": "#EAB308", 
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "Sorting Algorithms", "notes": "Comparison and non-comparison sorts", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Divide & Conquer", "notes": "Recursive algorithm design", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Dynamic Programming", "notes": "Optimal substructure problems", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Greedy Algorithms", "notes": "Local optimization strategies", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Graph Algorithms", "notes": "Shortest path and spanning tree", "audio": null, "audioDuration": 0}
+                ]
+            },
+            "dbms": {
+                "id": "dbms",
+                "name": "Database Management",
+                "color": "#06B6D4",
+                "questions": [
+                    {"id": this.generateId(), "shorthand": "ER Diagrams & Modeling", "notes": "Entity-relationship design", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Normalization", "notes": "Normal forms and dependency theory", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "SQL Queries & Joins", "notes": "Complex query writing", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Transactions & ACID", "notes": "Transaction properties and control", "audio": null, "audioDuration": 0},
+                    {"id": this.generateId(), "shorthand": "Indexing & Query Optimization", "notes": "Performance optimization techniques", "audio": null, "audioDuration": 0}
+                ]
             }
-        } catch (error) {
-            console.error('Error loading data:', error);
-            this.loadDefaultTopics();
-        }
+        };
+        
+        this.saveData(defaultData);
+        return defaultData;
     }
 
-    ensureDefaultTopics() {
-        let needsUpdate = false;
-        for (const [id, topicData] of Object.entries(this.defaultTopicsData)) {
-            if (!this.topics[id]) {
-                this.topics[id] = {
-                    id: id,
-                    name: topicData.name,
-                    color: topicData.color,
-                    questions: topicData.questions.map((q, index) => ({
-                        id: Date.now() + index + Math.random(),
-                        notes: q.notes,
-                        shorthand: q.shorthand || '',
-                        image: null,
-                        audio: null
-                    }))
-                };
-                needsUpdate = true;
-            }
-        }
-        if (needsUpdate) {
-            this.saveData();
-        }
+    saveData(data = this.data) {
+        localStorage.setItem('qrec-data', JSON.stringify(data));
+        this.data = data;
     }
 
-    loadDefaultTopics() {
-        this.topics = {};
-        for (const [id, topicData] of Object.entries(this.defaultTopicsData)) {
-            this.topics[id] = {
-                id: id,
-                name: topicData.name,
-                color: topicData.color,
-                questions: topicData.questions.map((q, index) => ({
-                    id: Date.now() + index + Math.random(),
-                    notes: q.notes,
-                    shorthand: q.shorthand || '',
-                    image: null,
-                    audio: null
-                }))
-            };
-        }
-        this.saveData();
-        console.log('Default topics loaded:', Object.keys(this.topics));
+    generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
 
-    saveData() {
-        try {
-            // Only save our 10 defined topics
-            const filteredTopics = {};
-            Object.keys(this.defaultTopicsData).forEach(topicId => {
-                if (this.topics[topicId]) {
-                    filteredTopics[topicId] = this.topics[topicId];
-                }
-            });
-            localStorage.setItem('questionRecorderData', JSON.stringify(filteredTopics));
-            console.log('Data saved to localStorage');
-        } catch (error) {
-            console.error('Error saving data:', error);
-            this.showError('Failed to save data: ' + error.message);
-        }
-    }
-
-    setupEventListeners() {
-        console.log('Setting up event listeners...');
-
+    bindEvents() {
         // Theme toggle
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
-
-        // Dashboard events
-        document.addEventListener('click', (e) => {
-            // Topic card click
-            const topicCard = e.target.closest('.topic-card');
-            if (topicCard && !e.target.classList.contains('delete-topic')) {
-                e.preventDefault();
-                const topicId = topicCard.getAttribute('data-topic-id');
-                this.openTopic(topicId);
-                return;
-            }
-
-            // Back button
-            if (e.target && e.target.id === 'backBtn') {
-                e.preventDefault();
-                this.showDashboard();
-                return;
-            }
-
-            // Save all button
-            if (e.target && e.target.id === 'saveAllBtn') {
-                e.preventDefault();
-                this.saveAllQuestions();
-                return;
-            }
-
-            // Modal close buttons
-            if (e.target && e.target.classList.contains('modal-close')) {
-                e.preventDefault();
-                const modal = e.target.closest('.modal');
-                if (modal) {
-                    this.hideModal(modal.id);
-                }
-                return;
-            }
-
-            // Flash card actions
-            if (e.target && e.target.hasAttribute('data-edit-index')) {
-                e.preventDefault();
-                e.stopPropagation();
-                const index = parseInt(e.target.getAttribute('data-edit-index'));
-                this.editQuestion(index);
-                return;
-            }
-
-            if (e.target && e.target.hasAttribute('data-delete-index')) {
-                e.preventDefault();
-                e.stopPropagation();
-                const index = parseInt(e.target.getAttribute('data-delete-index'));
-                this.deleteQuestion(index);
-                return;
-            }
-
-            // Card record buttons
-            if (e.target && e.target.hasAttribute('data-record-index')) {
-                e.preventDefault();
-                e.stopPropagation();
-                const index = parseInt(e.target.getAttribute('data-record-index'));
-                this.startCardRecording(index);
-                return;
-            }
-
-            // Card stop buttons
-            if (e.target && e.target.hasAttribute('data-stop-index')) {
-                e.preventDefault();
-                e.stopPropagation();
-                const index = parseInt(e.target.getAttribute('data-stop-index'));
-                this.stopCardRecording(index);
-                return;
-            }
-
-            // Card play buttons
-            if (e.target && e.target.hasAttribute('data-play-index')) {
-                e.preventDefault();
-                e.stopPropagation();
-                const index = parseInt(e.target.getAttribute('data-play-index'));
-                this.playCardAudio(index);
-                return;
-            }
-
-            // Image modal
-            if (e.target && e.target.hasAttribute('data-image-src')) {
-                e.preventDefault();
-                e.stopPropagation();
-                this.showImageModal(e.target.getAttribute('data-image-src'));
-                return;
-            }
-
-            // Audio speed change
-            if (e.target && e.target.hasAttribute('data-speed-index')) {
-                e.preventDefault();
-                e.stopPropagation();
-                const index = parseInt(e.target.getAttribute('data-speed-index'));
-                const speed = parseFloat(e.target.getAttribute('data-speed'));
-                this.changeAudioSpeed(index, speed);
-                return;
-            }
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            this.theme = this.theme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('qrec-theme', this.theme);
+            this.initTheme();
         });
 
-        // Form submissions
-        document.addEventListener('submit', (e) => {
-            if (e.target.id === 'addQuestionForm') {
-                e.preventDefault();
-                this.addQuestion();
-            }
-            if (e.target.id === 'editQuestionForm') {
-                e.preventDefault();
-                this.updateQuestion();
-            }
+        // Back button - Fixed navigation
+        document.getElementById('back-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showDashboard();
         });
 
-        // Audio range slider events
-        document.addEventListener('input', (e) => {
-            if (e.target && e.target.hasAttribute('data-audio-slider-index')) {
-                const index = parseInt(e.target.getAttribute('data-audio-slider-index'));
-                this.updateAudioTime(index, e.target.value);
-            }
-        });
-
-        // Recording controls
-        this.setupRecordingControls();
-        this.setupModalEvents();
-        this.setupGlobalEvents();
-
-        console.log('Event listeners setup complete');
-    }
-
-    setupRecordingControls() {
-        // Main form recording controls
-        const recordBtn = document.getElementById('recordBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const playBtn = document.getElementById('playBtn');
-        const clearAudioBtn = document.getElementById('clearAudioBtn');
-
-        if (recordBtn) {
-            recordBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.startRecording();
-            });
-        }
-
-        if (stopBtn) {
-            stopBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.stopRecording();
-            });
-        }
-
-        if (playBtn) {
-            playBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.playRecording();
-            });
-        }
-
-        if (clearAudioBtn) {
-            clearAudioBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.clearAudio();
-            });
-        }
-
-        // Edit modal recording controls
-        const editRecordBtn = document.getElementById('editRecordBtn');
-        const editStopBtn = document.getElementById('editStopBtn');
-        const editPlayBtn = document.getElementById('editPlayBtn');
-        const editClearAudioBtn = document.getElementById('editClearAudioBtn');
-
-        if (editRecordBtn) {
-            editRecordBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.startRecording(true);
-            });
-        }
-
-        if (editStopBtn) {
-            editStopBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.stopRecording(true);
-            });
-        }
-
-        if (editPlayBtn) {
-            editPlayBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.playRecording(true);
-            });
-        }
-
-        if (editClearAudioBtn) {
-            editClearAudioBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.clearAudio(true);
-            });
-        }
-    }
-
-    setupModalEvents() {
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal') && !e.target.classList.contains('hidden')) {
-                this.hideModal(e.target.id);
-            }
-        });
-
-        const cancelButtons = ['cancelEditQuestion'];
-        cancelButtons.forEach(id => {
-            const btn = document.getElementById(id);
-            if (btn) {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const modal = e.target.closest('.modal');
-                    if (modal) {
-                        this.hideModal(modal.id);
-                    }
-                });
-            }
+        // Add question form
+        document.getElementById('add-question-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addQuestion();
         });
     }
 
-    setupGlobalEvents() {
-        window.addEventListener('beforeunload', () => {
-            this.saveData();
-        });
+    showDashboard() {
+        this.currentView = 'dashboard';
+        this.currentTopic = null;
+        document.getElementById('dashboard').classList.remove('hidden');
+        document.getElementById('topic-view').classList.add('hidden');
+        this.renderDashboard();
+    }
 
-        setInterval(() => {
-            if (this.currentTopic) {
-                this.saveData();
-            }
-        }, 30000);
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const openModals = document.querySelectorAll('.modal:not(.hidden)');
-                openModals.forEach(modal => {
-                    this.hideModal(modal.id);
-                });
-            }
-        });
+    showTopic(topicId) {
+        this.currentView = 'topic';
+        this.currentTopic = topicId;
+        document.getElementById('dashboard').classList.add('hidden');
+        document.getElementById('topic-view').classList.remove('hidden');
+        this.renderTopicView();
     }
 
     renderDashboard() {
-        console.log('Rendering dashboard...');
-        const grid = document.getElementById('topicsGrid');
-        if (!grid) {
-            console.error('Topics grid not found');
-            return;
-        }
-
+        const grid = document.getElementById('topics-grid');
         grid.innerHTML = '';
-        
-        // Only render our 10 defined topics in a specific order
-        const orderedTopics = ['dm', 'em', 'toc', 'cd', 'coa', 'os', 'cn', 'ds', 'algo', 'dbms'];
-        
-        orderedTopics.forEach(topicId => {
-            const topic = this.topics[topicId];
-            if (topic) {
-                const questionCount = topic.questions ? topic.questions.length : 0;
-                const audioCount = topic.questions ? topic.questions.filter(q => q.audio).length : 0;
-                const imageCount = topic.questions ? topic.questions.filter(q => q.image).length : 0;
-                
-                const card = document.createElement('div');
-                card.className = `topic-card ${topic.color || 'bg-default'}`;
-                card.setAttribute('data-topic-id', topicId);
-                
-                card.innerHTML = `
+
+        Object.values(this.data).forEach(topic => {
+            const audioCount = topic.questions.filter(q => q.audio).length;
+            const card = document.createElement('div');
+            card.className = 'topic-card';
+            card.setAttribute('data-topic', topic.id);
+            card.innerHTML = `
+                <div class="topic-info">
+                    <div class="topic-code">${topic.id.toUpperCase()}</div>
                     <h3>${topic.name}</h3>
                     <div class="topic-stats">
                         <div class="stat">
-                            <span class="stat-number">${questionCount}</span>
-                            <span class="stat-label">Questions</span>
+                            <div class="stat-number">${topic.questions.length}</div>
+                            <div class="stat-label">Questions</div>
                         </div>
                         <div class="stat">
-                            <span class="stat-number">${audioCount}</span>
-                            <span class="stat-label">Audio</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number">${imageCount}</span>
-                            <span class="stat-label">Images</span>
+                            <div class="stat-number">${audioCount}</div>
+                            <div class="stat-label">Recorded</div>
                         </div>
                     </div>
-                    <div class="topic-card-footer">
-                        <span class="topic-progress">Click to study →</span>
-                    </div>
-                `;
-                
-                grid.appendChild(card);
-            }
-        });
-
-        // Show dashboard
-        document.getElementById('dashboard').classList.remove('hidden');
-        document.getElementById('topicView').classList.add('hidden');
-    }
-
-    renderFlashCards() {
-        const grid = document.getElementById('flashCardsGrid');
-        if (!grid || !this.currentTopic) return;
-
-        grid.innerHTML = '';
-        const topic = this.topics[this.currentTopic];
-        
-        if (!topic || !topic.questions || topic.questions.length === 0) {
-            grid.innerHTML = `
-                <div class="empty-state">
-                    <h3>No Flash Cards Yet</h3>
-                    <p>Add your first flash card using the form above.</p>
                 </div>
             `;
-            return;
-        }
-
-        topic.questions.forEach((question, index) => {
-            const card = document.createElement('div');
-            card.className = 'flash-card-enhanced';
             
-            card.innerHTML = `
-                <div class="flash-card-header">
-                    <span class="question-number">Q${index + 1}</span>
-                    <div class="flash-card-actions">
-                        <button class="card-action" data-edit-index="${index}" title="Edit">✏️</button>
-                        <button class="card-action card-action--delete" data-delete-index="${index}" title="Delete">🗑️</button>
-                    </div>
-                </div>
-
-                <div class="flash-card-content">
-                    ${question.image ? `
-                        <div class="flash-card-image-container">
-                            <img src="${question.image}" class="flash-card-image" data-image-src="${question.image}" alt="Question Image">
-                        </div>
-                    ` : ''}
-                    
-                    ${question.shorthand ? `
-                        <div class="flash-card-shorthand">${question.shorthand}</div>
-                    ` : ''}
-                    
-                    ${question.notes ? `
-                        <div class="flash-card-notes">${question.notes}</div>
-                    ` : ''}
-                    
-                    <div class="flash-card-audio-section">
-                        <div class="audio-panel">
-                            <div class="audio-controls">
-                                <button class="audio-btn record-btn" data-record-index="${index}" ${this.isRecording(index) ? 'disabled' : ''}>
-                                    🎤 ${this.isRecording(index) ? 'Recording...' : 'Record'}
-                                </button>
-                                <button class="audio-btn stop-btn" data-stop-index="${index}" ${!this.isRecording(index) ? 'disabled' : ''}>
-                                    ⏹ Stop
-                                </button>
-                                <button class="audio-btn play-btn" data-play-index="${index}" ${!question.audio ? 'disabled' : ''}>
-                                    ▶ Play
-                                </button>
-                            </div>
-                            
-                            <div class="recording-info" id="recordingInfo-${index}" ${this.isRecording(index) ? '' : 'style="display: none;"'}>
-                                <div class="recording-timer">
-                                    <span class="timer-label">Recording:</span>
-                                    <span class="timer-value" id="recordingTimer-${index}">00:00</span>
-                                </div>
-                                <div class="frequency-visualizer">
-                                    <canvas id="frequencyCanvas-${index}" width="200" height="40"></canvas>
-                                </div>
-                            </div>
-                            
-                            ${question.audio ? `
-                                <div class="audio-player-section">
-                                    <div class="audio-progress">
-                                        <input type="range" class="audio-slider" id="audioSlider-${index}" 
-                                               data-audio-slider-index="${index}" 
-                                               min="0" max="100" value="0">
-                                        <div class="audio-time">
-                                            <span id="currentTime-${index}">00:00</span> / 
-                                            <span id="duration-${index}">00:00</span>
-                                        </div>
-                                    </div>
-                                    <div class="audio-speed-controls">
-                                        <label>Speed:</label>
-                                        <button class="speed-btn" data-speed-index="${index}" data-speed="1">1x</button>
-                                        <button class="speed-btn" data-speed-index="${index}" data-speed="1.5">1.5x</button>
-                                        <button class="speed-btn" data-speed-index="${index}" data-speed="2">2x</button>
-                                    </div>
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
+            // Fixed: Ensure click event is properly bound to navigate to topic
+            card.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.showTopic(topic.id);
+            });
             
             grid.appendChild(card);
         });
     }
 
-    openTopic(topicId) {
-        console.log('Opening topic:', topicId);
-        this.currentTopic = topicId;
-        const topic = this.topics[topicId];
-        
+    renderTopicView() {
+        const topic = this.data[this.currentTopic];
         if (!topic) {
-            console.error('Topic not found:', topicId);
+            this.showDashboard();
+            return;
+        }
+        
+        document.getElementById('topic-title').textContent = topic.name;
+        document.getElementById('topic-subtitle').textContent = `${topic.questions.length} questions`;
+        
+        // Clear and reset the form
+        document.getElementById('add-question-form').reset();
+        
+        this.renderQuestions();
+    }
+
+    renderQuestions() {
+        const grid = document.getElementById('questions-grid');
+        const topic = this.data[this.currentTopic];
+        grid.innerHTML = '';
+
+        if (!topic || !topic.questions) {
             return;
         }
 
-        // Update topic title
-        const titleElement = document.getElementById('topicTitle');
-        if (titleElement) {
-            titleElement.textContent = topic.name;
-        }
+        topic.questions.forEach((question, index) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            card.setAttribute('data-topic', this.currentTopic);
+            card.innerHTML = `
+                <div class="question-header">
+                    <div class="question-number">${index + 1}</div>
+                    <div class="question-content">
+                        <div class="question-shorthand">${question.shorthand || 'Untitled Question'}</div>
+                        <textarea class="question-notes" placeholder="Add your notes here...">${question.notes || ''}</textarea>
+                    </div>
+                </div>
+                <div class="audio-player-wrapper"></div>
+                <div class="question-actions">
+                    <button class="btn btn--outline btn--sm delete-question" data-id="${question.id}">Delete</button>
+                </div>
+            `;
 
-        // Render flash cards
-        this.renderFlashCards();
+            // Add audio player
+            const audioWrapper = card.querySelector('.audio-player-wrapper');
+            const audioPlayer = new AudioPlayer(question, this.currentTopic, (updatedQuestion) => {
+                question.audio = updatedQuestion.audio;
+                question.audioDuration = updatedQuestion.audioDuration;
+                this.saveData();
+                this.renderDashboard(); // Update stats on dashboard
+            });
+            audioWrapper.appendChild(audioPlayer.element);
 
-        // Show topic view
-        document.getElementById('dashboard').classList.add('hidden');
-        document.getElementById('topicView').classList.remove('hidden');
-    }
+            // Bind events
+            const notesTextarea = card.querySelector('.question-notes');
+            notesTextarea.addEventListener('blur', () => {
+                question.notes = notesTextarea.value;
+                this.saveData();
+            });
 
-    showDashboard() {
-        this.currentTopic = null;
-        this.renderDashboard();
-    }
-
-    hideModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.classList.add('hidden');
-        }
-    }
-
-    addQuestion() {
-        if (!this.currentTopic) return;
-
-        const notesInput = document.getElementById('questionNotes');
-        const shorthandInput = document.getElementById('questionShorthand');
-        const imageInput = document.getElementById('questionImage');
-
-        const notes = notesInput.value.trim();
-        const shorthand = shorthandInput.value.trim();
-        
-        // At least one field must be filled
-        if (!notes && !shorthand && !imageInput.files[0] && !this.currentRecording) {
-            this.showError('Please fill at least one field (notes, shorthand, image, or audio)');
-            return;
-        }
-
-        const question = {
-            id: Date.now() + Math.random(),
-            notes: notes,
-            shorthand: shorthand,
-            image: null,
-            audio: this.currentRecording
-        };
-
-        // Handle image upload
-        if (imageInput.files && imageInput.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                question.image = e.target.result;
-                this.addQuestionToTopic(question);
-            };
-            reader.readAsDataURL(imageInput.files[0]);
-        } else {
-            this.addQuestionToTopic(question);
-        }
-    }
-
-    addQuestionToTopic(question) {
-        if (!this.topics[this.currentTopic]) {
-            this.topics[this.currentTopic] = { questions: [] };
-        }
-        if (!this.topics[this.currentTopic].questions) {
-            this.topics[this.currentTopic].questions = [];
-        }
-
-        this.topics[this.currentTopic].questions.push(question);
-        this.saveData();
-        
-        // Clear form
-        document.getElementById('questionNotes').value = '';
-        document.getElementById('questionShorthand').value = '';
-        document.getElementById('questionImage').value = '';
-        this.clearAudio();
-        
-        this.renderFlashCards();
-        this.showSuccess('Flash card added successfully!');
-    }
-
-    editQuestion(index) {
-        if (!this.currentTopic || !this.topics[this.currentTopic].questions[index]) return;
-
-        this.editingQuestionIndex = index;
-        const question = this.topics[this.currentTopic].questions[index];
-
-        document.getElementById('editQuestionNotes').value = question.notes || '';
-        document.getElementById('editQuestionShorthand').value = question.shorthand || '';
-        
-        // Clear previous audio in edit modal
-        this.clearAudio(true);
-        
-        // If question has audio, enable play button
-        const editPlayBtn = document.getElementById('editPlayBtn');
-        const editClearAudioBtn = document.getElementById('editClearAudioBtn');
-        if (editPlayBtn && editClearAudioBtn) {
-            if (question.audio) {
-                editPlayBtn.disabled = false;
-                editClearAudioBtn.disabled = false;
-            } else {
-                editPlayBtn.disabled = true;
-                editClearAudioBtn.disabled = true;
-            }
-        }
-
-        document.getElementById('editQuestionModal').classList.remove('hidden');
-    }
-
-    updateQuestion() {
-        if (!this.currentTopic || this.editingQuestionIndex === null) return;
-
-        const question = this.topics[this.currentTopic].questions[this.editingQuestionIndex];
-        const notes = document.getElementById('editQuestionNotes').value.trim();
-        const shorthand = document.getElementById('editQuestionShorthand').value.trim();
-        const imageInput = document.getElementById('editQuestionImage');
-
-        question.notes = notes;
-        question.shorthand = shorthand;
-
-        // Update audio if new recording was made
-        if (this.currentRecording) {
-            question.audio = this.currentRecording;
-        }
-
-        // Handle image upload
-        if (imageInput.files && imageInput.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                question.image = e.target.result;
-                this.completeUpdate();
-            };
-            reader.readAsDataURL(imageInput.files[0]);
-        } else {
-            this.completeUpdate();
-        }
-    }
-
-    completeUpdate() {
-        this.saveData();
-        this.hideModal('editQuestionModal');
-        this.renderFlashCards();
-        this.editingQuestionIndex = null;
-        this.clearAudio(true);
-        this.showSuccess('Flash card updated successfully!');
-    }
-
-    deleteQuestion(index) {
-        if (!this.currentTopic || !this.topics[this.currentTopic].questions[index]) return;
-
-        if (confirm('Are you sure you want to delete this flash card?')) {
-            this.topics[this.currentTopic].questions.splice(index, 1);
-            this.saveData();
-            this.renderFlashCards();
-            this.showSuccess('Flash card deleted successfully!');
-        }
-    }
-
-    // Enhanced audio recording with frequency analysis
-    async startCardRecording(index) {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.mediaRecorder = new MediaRecorder(stream);
-            this.audioChunks = [];
-
-            // Setup audio context for frequency analysis
-            const audioContext = new AudioContext();
-            const analyser = audioContext.createAnalyser();
-            const microphone = audioContext.createMediaStreamSource(stream);
-            
-            analyser.fftSize = 256;
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-
-            microphone.connect(analyser);
-
-            this.audioContexts.set(index, audioContext);
-            this.analyserNodes.set(index, { analyser, dataArray, bufferLength });
-
-            // Start recording timer
-            const startTime = Date.now();
-            const timer = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                const minutes = Math.floor(elapsed / 60);
-                const seconds = elapsed % 60;
-                const timerElement = document.getElementById(`recordingTimer-${index}`);
-                if (timerElement) {
-                    timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                }
-                
-                // Update frequency visualization
-                this.updateFrequencyVisualization(index);
-            }, 100);
-
-            this.recordingTimers.set(index, timer);
-
-            this.mediaRecorder.ondataavailable = (event) => {
-                this.audioChunks.push(event.data);
-            };
-
-            this.mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-                const reader = new FileReader();
-                reader.onload = () => {
-                    if (this.topics[this.currentTopic] && this.topics[this.currentTopic].questions[index]) {
-                        this.topics[this.currentTopic].questions[index].audio = reader.result;
-                        this.saveData();
-                        this.renderFlashCards();
-                    }
-                };
-                reader.readAsDataURL(audioBlob);
-                
-                // Cleanup
-                stream.getTracks().forEach(track => track.stop());
-                audioContext.close();
-                clearInterval(timer);
-                this.recordingTimers.delete(index);
-                this.audioContexts.delete(index);
-                this.analyserNodes.delete(index);
-            };
-
-            this.mediaRecorder.start();
-            
-            // Show recording info panel
-            const recordingInfo = document.getElementById(`recordingInfo-${index}`);
-            if (recordingInfo) {
-                recordingInfo.style.display = 'block';
-            }
-            
-            this.renderFlashCards(); // Re-render to show recording state
-        } catch (error) {
-            console.error('Error starting card recording:', error);
-            this.showError('Failed to start recording. Please check microphone permissions.');
-        }
-    }
-
-    stopCardRecording(index) {
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            this.mediaRecorder.stop();
-        }
-        
-        // Hide recording info panel
-        const recordingInfo = document.getElementById(`recordingInfo-${index}`);
-        if (recordingInfo) {
-            recordingInfo.style.display = 'none';
-        }
-    }
-
-    updateFrequencyVisualization(index) {
-        const canvas = document.getElementById(`frequencyCanvas-${index}`);
-        const analyserData = this.analyserNodes.get(index);
-        
-        if (!canvas || !analyserData) return;
-
-        const ctx = canvas.getContext('2d');
-        const { analyser, dataArray, bufferLength } = analyserData;
-
-        analyser.getByteFrequencyData(dataArray);
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const barWidth = (canvas.width / bufferLength) * 2.5;
-        let barHeight;
-        let x = 0;
-
-        for (let i = 0; i < bufferLength; i++) {
-            barHeight = (dataArray[i] / 255) * canvas.height;
-
-            const red = barHeight + 25 * (i / bufferLength);
-            const green = 250 * (i / bufferLength);
-            const blue = 50;
-
-            ctx.fillStyle = `rgb(${red},${green},${blue})`;
-            ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-
-            x += barWidth + 1;
-        }
-    }
-
-    playCardAudio(index) {
-        if (this.topics[this.currentTopic] && this.topics[this.currentTopic].questions[index] && this.topics[this.currentTopic].questions[index].audio) {
-            const audio = new Audio(this.topics[this.currentTopic].questions[index].audio);
-            
-            // Update audio progress
-            audio.addEventListener('loadedmetadata', () => {
-                const durationElement = document.getElementById(`duration-${index}`);
-                if (durationElement) {
-                    const minutes = Math.floor(audio.duration / 60);
-                    const seconds = Math.floor(audio.duration % 60);
-                    durationElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            const deleteBtn = card.querySelector('.delete-question');
+            deleteBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (confirm('Are you sure you want to delete this question?')) {
+                    this.deleteQuestion(question.id);
                 }
             });
 
-            audio.addEventListener('timeupdate', () => {
-                const currentTimeElement = document.getElementById(`currentTime-${index}`);
-                const sliderElement = document.getElementById(`audioSlider-${index}`);
-                
-                if (currentTimeElement && sliderElement) {
-                    const minutes = Math.floor(audio.currentTime / 60);
-                    const seconds = Math.floor(audio.currentTime % 60);
-                    currentTimeElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                    
-                    const progress = (audio.currentTime / audio.duration) * 100;
-                    sliderElement.value = progress || 0;
-                }
-            });
-
-            audio.play().catch(error => {
-                console.error('Error playing card audio:', error);
-                this.showError('Failed to play audio');
-            });
-        }
-    }
-
-    updateAudioTime(index, value) {
-        // This would update the audio playback position based on slider
-        // Implementation depends on having access to the audio element
-        console.log(`Updating audio time for card ${index} to ${value}%`);
-    }
-
-    changeAudioSpeed(index, speed) {
-        // This would change the playback speed
-        // Implementation depends on having access to the audio element
-        console.log(`Changing audio speed for card ${index} to ${speed}x`);
-        
-        // Update active speed button
-        const speedButtons = document.querySelectorAll(`[data-speed-index="${index}"]`);
-        speedButtons.forEach(btn => {
-            btn.classList.remove('active');
-            if (parseFloat(btn.getAttribute('data-speed')) === speed) {
-                btn.classList.add('active');
-            }
+            grid.appendChild(card);
         });
     }
 
-    isRecording(index) {
-        return this.mediaRecorder && this.mediaRecorder.state === 'recording' && this.recordingTimers.has(index);
-    }
-
-    // Existing methods for main form recording
-    async startRecording(isEdit = false) {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.mediaRecorder = new MediaRecorder(stream);
-            this.audioChunks = [];
-
-            this.mediaRecorder.ondataavailable = (event) => {
-                this.audioChunks.push(event.data);
-            };
-
-            this.mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-                const reader = new FileReader();
-                reader.onload = () => {
-                    this.currentRecording = reader.result;
-                    this.updateAudioControls(isEdit);
-                };
-                reader.readAsDataURL(audioBlob);
-                
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            this.mediaRecorder.start();
-            this.updateRecordingState(isEdit, true);
-        } catch (error) {
-            console.error('Error starting recording:', error);
-            this.showError('Failed to start recording. Please check microphone permissions.');
-        }
-    }
-
-    stopRecording(isEdit = false) {
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            this.mediaRecorder.stop();
-            this.updateRecordingState(isEdit, false);
-        }
-    }
-
-    playRecording(isEdit = false) {
-        const audioData = this.currentRecording || (this.editingQuestionIndex !== null && this.topics[this.currentTopic].questions[this.editingQuestionIndex].audio);
-        if (audioData) {
-            const audio = new Audio(audioData);
-            audio.play().catch(error => {
-                console.error('Error playing audio:', error);
-                this.showError('Failed to play audio');
-            });
-        }
-    }
-
-    clearAudio(isEdit = false) {
-        this.currentRecording = null;
-        this.updateAudioControls(isEdit);
-    }
-
-    updateRecordingState(isEdit, isRecording) {
-        const prefix = isEdit ? 'edit' : '';
-        const recordBtn = document.getElementById(`${prefix}RecordBtn`);
-        const stopBtn = document.getElementById(`${prefix}StopBtn`);
-        const status = document.getElementById(`${prefix === 'edit' ? 'editRecordingStatus' : 'recordingStatus'}`);
-
-        if (recordBtn) recordBtn.disabled = isRecording;
-        if (stopBtn) stopBtn.disabled = !isRecording;
-        if (status) status.textContent = isRecording ? 'Recording...' : '';
-    }
-
-    updateAudioControls(isEdit) {
-        const prefix = isEdit ? 'edit' : '';
-        const playBtn = document.getElementById(`${prefix}PlayBtn`);
-        const clearBtn = document.getElementById(`${prefix}ClearAudioBtn`);
-
-        if (playBtn) playBtn.disabled = !this.currentRecording;
-        if (clearBtn) clearBtn.disabled = !this.currentRecording;
-    }
-
-    showImageModal(imageSrc) {
-        const modal = document.getElementById('imageModal');
-        const modalImage = document.getElementById('modalImage');
-        if (modal && modalImage) {
-            modalImage.src = imageSrc;
-            modal.classList.remove('hidden');
-        }
-    }
-
-    saveAllQuestions() {
-        this.saveData();
-        this.showSuccess('All questions saved successfully!');
+    addQuestion() {
+        const shorthandInput = document.getElementById('shorthand');
+        const notesInput = document.getElementById('notes');
         
-        // Add visual feedback
-        const saveBtn = document.getElementById('saveAllBtn');
-        if (saveBtn) {
-            saveBtn.classList.add('save-success');
-            setTimeout(() => {
-                saveBtn.classList.remove('save-success');
-            }, 800);
+        const shorthand = shorthandInput.value.trim();
+        const notes = notesInput.value.trim();
+
+        if (!shorthand) {
+            shorthandInput.focus();
+            return;
         }
+
+        const newQuestion = {
+            id: this.generateId(),
+            shorthand,
+            notes: notes || '',
+            audio: null,
+            audioDuration: 0
+        };
+
+        this.data[this.currentTopic].questions.push(newQuestion);
+        this.saveData();
+        
+        // Clear form
+        shorthandInput.value = '';
+        notesInput.value = '';
+        
+        this.renderQuestions();
     }
 
-    showLoading() {
-        const loading = document.getElementById('loadingIndicator');
-        if (loading) loading.classList.remove('hidden');
-    }
-
-    hideLoading() {
-        const loading = document.getElementById('loadingIndicator');
-        if (loading) loading.classList.add('hidden');
-    }
-
-    showSuccess(message) {
-        const notification = document.getElementById('successNotification');
-        if (notification) {
-            notification.querySelector('span').textContent = message;
-            notification.classList.remove('hidden');
-            setTimeout(() => {
-                notification.classList.add('hidden');
-            }, 3000);
-        }
-    }
-
-    showError(message) {
-        alert(message); // Simple error display - could be enhanced with a proper error modal
+    deleteQuestion(questionId) {
+        const topic = this.data[this.currentTopic];
+        topic.questions = topic.questions.filter(q => q.id !== questionId);
+        this.saveData();
+        this.renderQuestions();
     }
 }
 
-// Initialize the app when DOM is loaded
+// Professional Audio Player Class
+class AudioPlayer {
+    constructor(question, topicId, onUpdate) {
+        this.question = question;
+        this.topicId = topicId;
+        this.onUpdate = onUpdate;
+        this.isRecording = false;
+        this.isPlaying = false;
+        this.currentTime = 0;
+        this.duration = 0;
+        this.playbackRate = 1;
+        this.volume = 1;
+        this.isMuted = false;
+        
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.audioContext = null;
+        this.analyser = null;
+        this.dataArray = null;
+        this.recordingStartTime = 0;
+        this.recordingTimer = null;
+        this.visualizationFrame = null;
+        
+        this.createElement();
+        this.bindEvents();
+        
+        if (question.audio) {
+            this.loadAudio();
+        }
+    }
+
+    createElement() {
+        const template = document.getElementById('audio-player-template');
+        this.element = template.content.cloneNode(true).firstElementChild;
+        
+        // Get references to elements
+        this.recordingSection = this.element.querySelector('.recording-section');
+        this.playbackSection = this.element.querySelector('.playback-section');
+        this.recordButton = this.element.querySelector('.btn-record');
+        this.stopRecordButton = this.element.querySelector('.btn-stop-record');
+        this.playPauseButton = this.element.querySelector('.btn-play-pause');
+        this.stopButton = this.element.querySelector('.btn-stop');
+        this.progressBar = this.element.querySelector('.progress-bar');
+        this.progressFill = this.element.querySelector('.progress-fill');
+        this.currentTimeSpan = this.element.querySelector('.current-time');
+        this.totalTimeSpan = this.element.querySelector('.total-time');
+        this.timerText = this.element.querySelector('.timer-text');
+        this.canvas = this.element.querySelector('.frequency-canvas');
+        this.audioElement = this.element.querySelector('.audio-element');
+        this.speedButtons = this.element.querySelectorAll('.speed-btn');
+        this.volumeButton = this.element.querySelector('.btn-volume');
+        
+        this.ctx = this.canvas.getContext('2d');
+    }
+
+    bindEvents() {
+        this.recordButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.toggleRecording();
+        });
+        
+        this.stopRecordButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.stopRecording();
+        });
+        
+        this.playPauseButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.togglePlayback();
+        });
+        
+        this.stopButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.stopPlayback();
+        });
+        
+        this.progressBar.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.seek(e);
+        });
+        
+        this.volumeButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.toggleMute();
+        });
+        
+        this.speedButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.setPlaybackRate(parseFloat(btn.dataset.speed));
+            });
+        });
+
+        this.audioElement.addEventListener('loadedmetadata', () => {
+            this.duration = this.audioElement.duration;
+            this.updateTimeDisplay();
+        });
+
+        this.audioElement.addEventListener('timeupdate', () => {
+            this.currentTime = this.audioElement.currentTime;
+            this.updateProgress();
+        });
+
+        this.audioElement.addEventListener('ended', () => {
+            this.isPlaying = false;
+            this.updatePlayButton();
+            this.currentTime = 0;
+            this.updateProgress();
+        });
+    }
+
+    async toggleRecording() {
+        if (!this.isRecording) {
+            await this.startRecording();
+        } else {
+            this.stopRecording();
+        }
+    }
+
+    async startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 44100
+                }
+            });
+            
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.analyser = this.audioContext.createAnalyser();
+            const source = this.audioContext.createMediaStreamSource(stream);
+            source.connect(this.analyser);
+            
+            this.analyser.fftSize = 256;
+            this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+            
+            this.mediaRecorder = new MediaRecorder(stream, {
+                mimeType: 'audio/webm;codecs=opus'
+            });
+            this.audioChunks = [];
+            
+            this.mediaRecorder.addEventListener('dataavailable', event => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                }
+            });
+            
+            this.mediaRecorder.addEventListener('stop', () => {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm;codecs=opus' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                this.question.audio = audioUrl;
+                this.question.audioDuration = (Date.now() - this.recordingStartTime) / 1000;
+                this.onUpdate(this.question);
+                this.loadAudio();
+                stream.getTracks().forEach(track => track.stop());
+                
+                if (this.audioContext) {
+                    this.audioContext.close();
+                }
+            });
+            
+            this.isRecording = true;
+            this.recordingStartTime = Date.now();
+            this.mediaRecorder.start(100);
+            
+            this.showRecordingUI();
+            this.startVisualization();
+            this.startRecordingTimer();
+            
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            alert('Could not access microphone. Please check permissions and try again.');
+        }
+    }
+
+    stopRecording() {
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+            this.hideRecordingUI();
+            
+            if (this.recordingTimer) {
+                clearInterval(this.recordingTimer);
+            }
+            
+            if (this.visualizationFrame) {
+                cancelAnimationFrame(this.visualizationFrame);
+            }
+        }
+    }
+
+    loadAudio() {
+        if (this.question.audio) {
+            this.audioElement.src = this.question.audio;
+            this.duration = this.question.audioDuration || 0;
+            this.updateTimeDisplay();
+        }
+    }
+
+    togglePlayback() {
+        if (!this.question.audio) return;
+        
+        if (this.isPlaying) {
+            this.audioElement.pause();
+            this.isPlaying = false;
+        } else {
+            this.audioElement.play().catch(error => {
+                console.error('Error playing audio:', error);
+            });
+            this.isPlaying = true;
+        }
+        this.updatePlayButton();
+    }
+
+    stopPlayback() {
+        this.audioElement.pause();
+        this.audioElement.currentTime = 0;
+        this.currentTime = 0;
+        this.isPlaying = false;
+        this.updatePlayButton();
+        this.updateProgress();
+    }
+
+    seek(event) {
+        if (!this.question.audio) return;
+        
+        const rect = this.progressBar.getBoundingClientRect();
+        const percent = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+        const newTime = percent * this.duration;
+        
+        this.audioElement.currentTime = newTime;
+        this.currentTime = newTime;
+        this.updateProgress();
+    }
+
+    setPlaybackRate(rate) {
+        this.playbackRate = rate;
+        if (this.audioElement) {
+            this.audioElement.playbackRate = rate;
+        }
+        
+        this.speedButtons.forEach(btn => {
+            btn.classList.toggle('active', parseFloat(btn.dataset.speed) === rate);
+        });
+    }
+
+    toggleMute() {
+        if (!this.isMuted) {
+            this.audioElement.volume = 0;
+            this.volumeButton.querySelector('.volume-icon').textContent = '🔇';
+            this.isMuted = true;
+        } else {
+            this.audioElement.volume = this.volume;
+            this.volumeButton.querySelector('.volume-icon').textContent = '🔊';
+            this.isMuted = false;
+        }
+    }
+
+    showRecordingUI() {
+        this.recordingSection.classList.remove('hidden');
+        this.recordButton.classList.add('recording');
+        this.recordButton.querySelector('.record-text').textContent = 'Recording...';
+    }
+
+    hideRecordingUI() {
+        this.recordingSection.classList.add('hidden');
+        this.recordButton.classList.remove('recording');
+        this.recordButton.querySelector('.record-text').textContent = 'Record';
+    }
+
+    updatePlayButton() {
+        const icon = this.playPauseButton.querySelector('.play-icon');
+        icon.textContent = this.isPlaying ? '⏸️' : '▶️';
+    }
+
+    updateProgress() {
+        if (this.duration > 0) {
+            const percent = (this.currentTime / this.duration) * 100;
+            this.progressFill.style.width = `${percent}%`;
+        }
+        this.updateTimeDisplay();
+    }
+
+    updateTimeDisplay() {
+        this.currentTimeSpan.textContent = this.formatTime(this.currentTime);
+        this.totalTimeSpan.textContent = this.formatTime(this.duration);
+    }
+
+    startRecordingTimer() {
+        this.recordingTimer = setInterval(() => {
+            if (this.isRecording) {
+                const elapsed = (Date.now() - this.recordingStartTime) / 1000;
+                this.timerText.textContent = this.formatTime(elapsed);
+            }
+        }, 100);
+    }
+
+    startVisualization() {
+        const draw = () => {
+            if (!this.isRecording) {
+                return;
+            }
+            
+            this.analyser.getByteFrequencyData(this.dataArray);
+            
+            this.ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim();
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            const barWidth = this.canvas.width / this.dataArray.length * 2.5;
+            let x = 0;
+            
+            for (let i = 0; i < this.dataArray.length; i++) {
+                const barHeight = (this.dataArray[i] / 255) * this.canvas.height * 0.8;
+                
+                // Use primary color for visualization
+                const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim();
+                this.ctx.fillStyle = primaryColor;
+                this.ctx.fillRect(x, this.canvas.height - barHeight, barWidth, barHeight);
+                
+                x += barWidth + 1;
+            }
+            
+            this.visualizationFrame = requestAnimationFrame(draw);
+        };
+        
+        draw();
+    }
+
+    formatTime(seconds) {
+        if (!seconds || isNaN(seconds)) seconds = 0;
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+}
+
+// Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-    const app = new QuestionRecorder();
-    app.init();
+    window.qrecApp = new QRecApp();
 });

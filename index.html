@@ -9,10 +9,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body data-color-scheme="dark">
     <div class="theme-toggle">
         <button id="themeToggle" class="theme-toggle-btn" aria-label="Toggle theme">
-            <span class="theme-icon">🌙</span>
+            <span class="theme-icon">☀️</span>
         </button>
     </div>
 
@@ -20,14 +20,8 @@
         <!-- Dashboard View -->
         <div id="dashboard" class="dashboard">
             <div class="dashboard-header">
-                <h1>Your Study Topics</h1>
-                <p class="text-secondary">Organize your study materials with interactive flash cards</p>
-            </div>
-
-            <div class="add-topic-section">
-                <button id="addTopicBtn" class="btn btn--primary btn--lg">
-                    ➕ Add New Topic
-                </button>
+                <h1>Computer Science Study Topics</h1>
+                <p class="text-secondary">Master CS concepts with interactive flash cards and audio notes</p>
             </div>
 
             <div id="topicsGrid" class="topics-grid">
@@ -90,28 +84,6 @@
             <!-- Enhanced Flash Cards Grid -->
             <div id="flashCardsGrid" class="flash-cards-grid">
                 <!-- Flash cards will be populated by JavaScript -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Topic Modal -->
-    <div id="addTopicModal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Add New Topic</h3>
-                <button class="modal-close">×</button>
-            </div>
-            <div class="modal-body">
-                <form id="addTopicForm">
-                    <div class="form-group">
-                        <label class="form-label" for="topicName">Topic Name</label>
-                        <input type="text" id="topicName" class="form-control" required placeholder="Enter topic name...">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" id="cancelAddTopic" class="btn btn--secondary">Cancel</button>
-                        <button type="submit" class="btn btn--primary">Create Topic</button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>

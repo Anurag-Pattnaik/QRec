@@ -7,9 +7,12 @@ class QuestionRecorder {
         this.currentRecording = null;
         this.editingQuestionIndex = null;
         this.microphonePermission = null;
-        this.currentTheme = localStorage.getItem('qrec-theme') || 'light';
+        this.currentTheme = localStorage.getItem('qrec-theme') || 'dark';
+        this.recordingTimers = new Map(); // Store recording timers for each card
+        this.audioContexts = new Map(); // Store audio contexts for frequency analysis
+        this.analyserNodes = new Map(); // Store analyser nodes for frequency visualization
 
-        // Enhanced CS topics with color schemes
+        // Only these 10 CS topics with specific color schemes
         this.defaultTopicsData = {
             dm: {
                 name: "Discrete Mathematics",
@@ -18,8 +21,8 @@ class QuestionRecorder {
                     {"notes": "", "shorthand": "Set Theory", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Relations & Functions", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Graph Theory", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Combinatorics", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Logic & Proofs", "hasImage": false, "hasAudio": false}
+                    {"notes": "", "shorthand": "Logic & Proofs", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "Combinatorics", "hasImage": false, "hasAudio": false}
                 ]
             },
             em: {
@@ -29,7 +32,7 @@ class QuestionRecorder {
                     {"notes": "", "shorthand": "Linear Algebra", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Calculus", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Differential Equations", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Probability", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "Probability & Statistics", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Complex Analysis", "hasImage": false, "hasAudio": false}
                 ]
             },
@@ -59,8 +62,8 @@ class QuestionRecorder {
                 name: "Computer Organization",
                 color: "bg-teal",
                 questions: [
-                    {"notes": "", "shorthand": "Instruction Set", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "CPU Design", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "Instruction Set Architecture", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "CPU Design & Control", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Memory Hierarchy", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "I/O Systems", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Pipeline & Hazards", "hasImage": false, "hasAudio": false}
@@ -74,18 +77,18 @@ class QuestionRecorder {
                     {"notes": "", "shorthand": "Memory Management", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "File Systems", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Synchronization", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Deadlock", "hasImage": false, "hasAudio": false}
+                    {"notes": "", "shorthand": "Deadlock Prevention", "hasImage": false, "hasAudio": false}
                 ]
             },
             cn: {
                 name: "Computer Networks",
                 color: "bg-indigo",
                 questions: [
-                    {"notes": "", "shorthand": "OSI Model", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "TCP/UDP", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "OSI & TCP/IP Model", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "TCP/UDP Protocols", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Routing Algorithms", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Network Security", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Error Detection", "hasImage": false, "hasAudio": false}
+                    {"notes": "", "shorthand": "Error Detection & Correction", "hasImage": false, "hasAudio": false}
                 ]
             },
             ds: {
@@ -95,7 +98,7 @@ class QuestionRecorder {
                     {"notes": "", "shorthand": "Arrays & Linked Lists", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Stacks & Queues", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Trees & BST", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Graphs", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "Graphs & Traversal", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Hash Tables", "hasImage": false, "hasAudio": false}
                 ]
             },
@@ -114,11 +117,11 @@ class QuestionRecorder {
                 name: "Database Management",
                 color: "bg-cyan",
                 questions: [
-                    {"notes": "", "shorthand": "ER Diagrams", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "ER Diagrams & Modeling", "hasImage": false, "hasAudio": false},
                     {"notes": "", "shorthand": "Normalization", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "SQL Queries", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Transactions", "hasImage": false, "hasAudio": false},
-                    {"notes": "", "shorthand": "Indexing", "hasImage": false, "hasAudio": false}
+                    {"notes": "", "shorthand": "SQL Queries & Joins", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "Transactions & ACID", "hasImage": false, "hasAudio": false},
+                    {"notes": "", "shorthand": "Indexing & Query Optimization", "hasImage": false, "hasAudio": false}
                 ]
             }
         };
@@ -167,7 +170,13 @@ class QuestionRecorder {
             const stored = localStorage.getItem('questionRecorderData');
             if (stored) {
                 const parsedData = JSON.parse(stored);
-                this.topics = parsedData;
+                // Filter to only include our 10 defined topics
+                this.topics = {};
+                Object.keys(this.defaultTopicsData).forEach(topicId => {
+                    if (parsedData[topicId]) {
+                        this.topics[topicId] = parsedData[topicId];
+                    }
+                });
                 console.log('Loaded topics from localStorage:', Object.keys(this.topics));
                 
                 // Ensure all default topics exist
@@ -228,7 +237,14 @@ class QuestionRecorder {
 
     saveData() {
         try {
-            localStorage.setItem('questionRecorderData', JSON.stringify(this.topics));
+            // Only save our 10 defined topics
+            const filteredTopics = {};
+            Object.keys(this.defaultTopicsData).forEach(topicId => {
+                if (this.topics[topicId]) {
+                    filteredTopics[topicId] = this.topics[topicId];
+                }
+            });
+            localStorage.setItem('questionRecorderData', JSON.stringify(filteredTopics));
             console.log('Data saved to localStorage');
         } catch (error) {
             console.error('Error saving data:', error);
@@ -247,28 +263,12 @@ class QuestionRecorder {
 
         // Dashboard events
         document.addEventListener('click', (e) => {
-            // Add topic button
-            if (e.target && e.target.id === 'addTopicBtn') {
-                e.preventDefault();
-                this.showAddTopicModal();
-                return;
-            }
-
             // Topic card click
             const topicCard = e.target.closest('.topic-card');
             if (topicCard && !e.target.classList.contains('delete-topic')) {
                 e.preventDefault();
                 const topicId = topicCard.getAttribute('data-topic-id');
                 this.openTopic(topicId);
-                return;
-            }
-
-            // Delete topic button
-            if (e.target && e.target.classList.contains('delete-topic')) {
-                e.preventDefault();
-                e.stopPropagation();
-                const topicId = e.target.getAttribute('data-topic-id');
-                this.deleteTopic(topicId);
                 return;
             }
 
@@ -347,6 +347,16 @@ class QuestionRecorder {
                 this.showImageModal(e.target.getAttribute('data-image-src'));
                 return;
             }
+
+            // Audio speed change
+            if (e.target && e.target.hasAttribute('data-speed-index')) {
+                e.preventDefault();
+                e.stopPropagation();
+                const index = parseInt(e.target.getAttribute('data-speed-index'));
+                const speed = parseFloat(e.target.getAttribute('data-speed'));
+                this.changeAudioSpeed(index, speed);
+                return;
+            }
         });
 
         // Form submissions
@@ -355,13 +365,17 @@ class QuestionRecorder {
                 e.preventDefault();
                 this.addQuestion();
             }
-            if (e.target.id === 'addTopicForm') {
-                e.preventDefault();
-                this.createTopic();
-            }
             if (e.target.id === 'editQuestionForm') {
                 e.preventDefault();
                 this.updateQuestion();
+            }
+        });
+
+        // Audio range slider events
+        document.addEventListener('input', (e) => {
+            if (e.target && e.target.hasAttribute('data-audio-slider-index')) {
+                const index = parseInt(e.target.getAttribute('data-audio-slider-index'));
+                this.updateAudioTime(index, e.target.value);
             }
         });
 
@@ -450,7 +464,7 @@ class QuestionRecorder {
             }
         });
 
-        const cancelButtons = ['cancelAddTopic', 'cancelEditQuestion'];
+        const cancelButtons = ['cancelEditQuestion'];
         cancelButtons.forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
@@ -495,50 +509,44 @@ class QuestionRecorder {
         }
 
         grid.innerHTML = '';
-        const topicEntries = Object.entries(this.topics);
-
-        if (topicEntries.length === 0) {
-            grid.innerHTML = `
-                <div class="empty-state">
-                    <h3>No Topics Yet</h3>
-                    <p>Create your first topic to start organizing your study materials with flash cards.</p>
-                </div>
-            `;
-            return;
-        }
-
-        topicEntries.forEach(([id, topic]) => {
-            const questionCount = topic.questions ? topic.questions.length : 0;
-            const audioCount = topic.questions ? topic.questions.filter(q => q.audio).length : 0;
-            const imageCount = topic.questions ? topic.questions.filter(q => q.image).length : 0;
-            
-            const card = document.createElement('div');
-            card.className = `topic-card ${topic.color || 'bg-default'}`;
-            card.setAttribute('data-topic-id', id);
-            
-            card.innerHTML = `
-                <button class="delete-topic" data-topic-id="${id}" title="Delete Topic">×</button>
-                <h3>${topic.name}</h3>
-                <div class="topic-stats">
-                    <div class="stat">
-                        <span class="stat-number">${questionCount}</span>
-                        <span class="stat-label">Questions</span>
+        
+        // Only render our 10 defined topics in a specific order
+        const orderedTopics = ['dm', 'em', 'toc', 'cd', 'coa', 'os', 'cn', 'ds', 'algo', 'dbms'];
+        
+        orderedTopics.forEach(topicId => {
+            const topic = this.topics[topicId];
+            if (topic) {
+                const questionCount = topic.questions ? topic.questions.length : 0;
+                const audioCount = topic.questions ? topic.questions.filter(q => q.audio).length : 0;
+                const imageCount = topic.questions ? topic.questions.filter(q => q.image).length : 0;
+                
+                const card = document.createElement('div');
+                card.className = `topic-card ${topic.color || 'bg-default'}`;
+                card.setAttribute('data-topic-id', topicId);
+                
+                card.innerHTML = `
+                    <h3>${topic.name}</h3>
+                    <div class="topic-stats">
+                        <div class="stat">
+                            <span class="stat-number">${questionCount}</span>
+                            <span class="stat-label">Questions</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-number">${audioCount}</span>
+                            <span class="stat-label">Audio</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-number">${imageCount}</span>
+                            <span class="stat-label">Images</span>
+                        </div>
                     </div>
-                    <div class="stat">
-                        <span class="stat-number">${audioCount}</span>
-                        <span class="stat-label">Audio</span>
+                    <div class="topic-card-footer">
+                        <span class="topic-progress">Click to study →</span>
                     </div>
-                    <div class="stat">
-                        <span class="stat-number">${imageCount}</span>
-                        <span class="stat-label">Images</span>
-                    </div>
-                </div>
-                <div class="topic-card-footer">
-                    <span class="topic-progress">Click to study →</span>
-                </div>
-            `;
-            
-            grid.appendChild(card);
+                `;
+                
+                grid.appendChild(card);
+            }
         });
 
         // Show dashboard
@@ -592,17 +600,48 @@ class QuestionRecorder {
                     ` : ''}
                     
                     <div class="flash-card-audio-section">
-                        <div class="audio-player">
-                            <button class="audio-btn record-btn" data-record-index="${index}" ${this.isRecording(index) ? 'disabled' : ''}>
-                                🎤 ${this.isRecording(index) ? 'Recording...' : 'Record'}
-                            </button>
-                            <button class="audio-btn stop-btn" data-stop-index="${index}" ${!this.isRecording(index) ? 'disabled' : ''}>
-                                ⏹ Stop
-                            </button>
-                            <button class="audio-btn play-btn" data-play-index="${index}" ${!question.audio ? 'disabled' : ''}>
-                                ▶ Play
-                            </button>
-                            ${question.audio ? '<span class="audio-indicator">🎵</span>' : ''}
+                        <div class="audio-panel">
+                            <div class="audio-controls">
+                                <button class="audio-btn record-btn" data-record-index="${index}" ${this.isRecording(index) ? 'disabled' : ''}>
+                                    🎤 ${this.isRecording(index) ? 'Recording...' : 'Record'}
+                                </button>
+                                <button class="audio-btn stop-btn" data-stop-index="${index}" ${!this.isRecording(index) ? 'disabled' : ''}>
+                                    ⏹ Stop
+                                </button>
+                                <button class="audio-btn play-btn" data-play-index="${index}" ${!question.audio ? 'disabled' : ''}>
+                                    ▶ Play
+                                </button>
+                            </div>
+                            
+                            <div class="recording-info" id="recordingInfo-${index}" ${this.isRecording(index) ? '' : 'style="display: none;"'}>
+                                <div class="recording-timer">
+                                    <span class="timer-label">Recording:</span>
+                                    <span class="timer-value" id="recordingTimer-${index}">00:00</span>
+                                </div>
+                                <div class="frequency-visualizer">
+                                    <canvas id="frequencyCanvas-${index}" width="200" height="40"></canvas>
+                                </div>
+                            </div>
+                            
+                            ${question.audio ? `
+                                <div class="audio-player-section">
+                                    <div class="audio-progress">
+                                        <input type="range" class="audio-slider" id="audioSlider-${index}" 
+                                               data-audio-slider-index="${index}" 
+                                               min="0" max="100" value="0">
+                                        <div class="audio-time">
+                                            <span id="currentTime-${index}">00:00</span> / 
+                                            <span id="duration-${index}">00:00</span>
+                                        </div>
+                                    </div>
+                                    <div class="audio-speed-controls">
+                                        <label>Speed:</label>
+                                        <button class="speed-btn" data-speed-index="${index}" data-speed="1">1x</button>
+                                        <button class="speed-btn" data-speed-index="${index}" data-speed="1.5">1.5x</button>
+                                        <button class="speed-btn" data-speed-index="${index}" data-speed="2">2x</button>
+                                    </div>
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                 </div>
@@ -641,63 +680,10 @@ class QuestionRecorder {
         this.renderDashboard();
     }
 
-    showAddTopicModal() {
-        const modal = document.getElementById('addTopicModal');
-        if (modal) {
-            modal.classList.remove('hidden');
-            document.getElementById('topicName').focus();
-        }
-    }
-
     hideModal(modalId) {
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.classList.add('hidden');
-        }
-    }
-
-    createTopic() {
-        const nameInput = document.getElementById('topicName');
-        const name = nameInput.value.trim();
-        
-        if (!name) {
-            this.showError('Please enter a topic name');
-            return;
-        }
-
-        const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        
-        if (this.topics[id]) {
-            this.showError('Topic already exists');
-            return;
-        }
-
-        this.topics[id] = {
-            id: id,
-            name: name,
-            color: 'bg-default',
-            questions: this.defaultQuestionTemplate.map((q, index) => ({
-                id: Date.now() + index + Math.random(),
-                notes: q.notes,
-                shorthand: q.shorthand,
-                image: null,
-                audio: null
-            }))
-        };
-
-        this.saveData();
-        this.hideModal('addTopicModal');
-        nameInput.value = '';
-        this.renderDashboard();
-        this.showSuccess('Topic created successfully!');
-    }
-
-    deleteTopic(topicId) {
-        if (confirm('Are you sure you want to delete this topic? This action cannot be undone.')) {
-            delete this.topics[topicId];
-            this.saveData();
-            this.renderDashboard();
-            this.showSuccess('Topic deleted successfully!');
         }
     }
 
@@ -836,7 +822,189 @@ class QuestionRecorder {
         }
     }
 
-    // Audio recording methods
+    // Enhanced audio recording with frequency analysis
+    async startCardRecording(index) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.mediaRecorder = new MediaRecorder(stream);
+            this.audioChunks = [];
+
+            // Setup audio context for frequency analysis
+            const audioContext = new AudioContext();
+            const analyser = audioContext.createAnalyser();
+            const microphone = audioContext.createMediaStreamSource(stream);
+            
+            analyser.fftSize = 256;
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            microphone.connect(analyser);
+
+            this.audioContexts.set(index, audioContext);
+            this.analyserNodes.set(index, { analyser, dataArray, bufferLength });
+
+            // Start recording timer
+            const startTime = Date.now();
+            const timer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                const timerElement = document.getElementById(`recordingTimer-${index}`);
+                if (timerElement) {
+                    timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+                
+                // Update frequency visualization
+                this.updateFrequencyVisualization(index);
+            }, 100);
+
+            this.recordingTimers.set(index, timer);
+
+            this.mediaRecorder.ondataavailable = (event) => {
+                this.audioChunks.push(event.data);
+            };
+
+            this.mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                const reader = new FileReader();
+                reader.onload = () => {
+                    if (this.topics[this.currentTopic] && this.topics[this.currentTopic].questions[index]) {
+                        this.topics[this.currentTopic].questions[index].audio = reader.result;
+                        this.saveData();
+                        this.renderFlashCards();
+                    }
+                };
+                reader.readAsDataURL(audioBlob);
+                
+                // Cleanup
+                stream.getTracks().forEach(track => track.stop());
+                audioContext.close();
+                clearInterval(timer);
+                this.recordingTimers.delete(index);
+                this.audioContexts.delete(index);
+                this.analyserNodes.delete(index);
+            };
+
+            this.mediaRecorder.start();
+            
+            // Show recording info panel
+            const recordingInfo = document.getElementById(`recordingInfo-${index}`);
+            if (recordingInfo) {
+                recordingInfo.style.display = 'block';
+            }
+            
+            this.renderFlashCards(); // Re-render to show recording state
+        } catch (error) {
+            console.error('Error starting card recording:', error);
+            this.showError('Failed to start recording. Please check microphone permissions.');
+        }
+    }
+
+    stopCardRecording(index) {
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            this.mediaRecorder.stop();
+        }
+        
+        // Hide recording info panel
+        const recordingInfo = document.getElementById(`recordingInfo-${index}`);
+        if (recordingInfo) {
+            recordingInfo.style.display = 'none';
+        }
+    }
+
+    updateFrequencyVisualization(index) {
+        const canvas = document.getElementById(`frequencyCanvas-${index}`);
+        const analyserData = this.analyserNodes.get(index);
+        
+        if (!canvas || !analyserData) return;
+
+        const ctx = canvas.getContext('2d');
+        const { analyser, dataArray, bufferLength } = analyserData;
+
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const barWidth = (canvas.width / bufferLength) * 2.5;
+        let barHeight;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+            barHeight = (dataArray[i] / 255) * canvas.height;
+
+            const red = barHeight + 25 * (i / bufferLength);
+            const green = 250 * (i / bufferLength);
+            const blue = 50;
+
+            ctx.fillStyle = `rgb(${red},${green},${blue})`;
+            ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+            x += barWidth + 1;
+        }
+    }
+
+    playCardAudio(index) {
+        if (this.topics[this.currentTopic] && this.topics[this.currentTopic].questions[index] && this.topics[this.currentTopic].questions[index].audio) {
+            const audio = new Audio(this.topics[this.currentTopic].questions[index].audio);
+            
+            // Update audio progress
+            audio.addEventListener('loadedmetadata', () => {
+                const durationElement = document.getElementById(`duration-${index}`);
+                if (durationElement) {
+                    const minutes = Math.floor(audio.duration / 60);
+                    const seconds = Math.floor(audio.duration % 60);
+                    durationElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            });
+
+            audio.addEventListener('timeupdate', () => {
+                const currentTimeElement = document.getElementById(`currentTime-${index}`);
+                const sliderElement = document.getElementById(`audioSlider-${index}`);
+                
+                if (currentTimeElement && sliderElement) {
+                    const minutes = Math.floor(audio.currentTime / 60);
+                    const seconds = Math.floor(audio.currentTime % 60);
+                    currentTimeElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    
+                    const progress = (audio.currentTime / audio.duration) * 100;
+                    sliderElement.value = progress || 0;
+                }
+            });
+
+            audio.play().catch(error => {
+                console.error('Error playing card audio:', error);
+                this.showError('Failed to play audio');
+            });
+        }
+    }
+
+    updateAudioTime(index, value) {
+        // This would update the audio playback position based on slider
+        // Implementation depends on having access to the audio element
+        console.log(`Updating audio time for card ${index} to ${value}%`);
+    }
+
+    changeAudioSpeed(index, speed) {
+        // This would change the playback speed
+        // Implementation depends on having access to the audio element
+        console.log(`Changing audio speed for card ${index} to ${speed}x`);
+        
+        // Update active speed button
+        const speedButtons = document.querySelectorAll(`[data-speed-index="${index}"]`);
+        speedButtons.forEach(btn => {
+            btn.classList.remove('active');
+            if (parseFloat(btn.getAttribute('data-speed')) === speed) {
+                btn.classList.add('active');
+            }
+        });
+    }
+
+    isRecording(index) {
+        return this.mediaRecorder && this.mediaRecorder.state === 'recording' && this.recordingTimers.has(index);
+    }
+
+    // Existing methods for main form recording
     async startRecording(isEdit = false) {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -908,60 +1076,6 @@ class QuestionRecorder {
 
         if (playBtn) playBtn.disabled = !this.currentRecording;
         if (clearBtn) clearBtn.disabled = !this.currentRecording;
-    }
-
-    // Card-specific audio methods
-    async startCardRecording(index) {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.mediaRecorder = new MediaRecorder(stream);
-            this.audioChunks = [];
-
-            this.mediaRecorder.ondataavailable = (event) => {
-                this.audioChunks.push(event.data);
-            };
-
-            this.mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-                const reader = new FileReader();
-                reader.onload = () => {
-                    if (this.topics[this.currentTopic] && this.topics[this.currentTopic].questions[index]) {
-                        this.topics[this.currentTopic].questions[index].audio = reader.result;
-                        this.saveData();
-                        this.renderFlashCards();
-                    }
-                };
-                reader.readAsDataURL(audioBlob);
-                
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            this.mediaRecorder.start();
-            this.renderFlashCards(); // Re-render to show recording state
-        } catch (error) {
-            console.error('Error starting card recording:', error);
-            this.showError('Failed to start recording. Please check microphone permissions.');
-        }
-    }
-
-    stopCardRecording(index) {
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            this.mediaRecorder.stop();
-        }
-    }
-
-    playCardAudio(index) {
-        if (this.topics[this.currentTopic] && this.topics[this.currentTopic].questions[index] && this.topics[this.currentTopic].questions[index].audio) {
-            const audio = new Audio(this.topics[this.currentTopic].questions[index].audio);
-            audio.play().catch(error => {
-                console.error('Error playing card audio:', error);
-                this.showError('Failed to play audio');
-            });
-        }
-    }
-
-    isRecording(index) {
-        return this.mediaRecorder && this.mediaRecorder.state === 'recording';
     }
 
     showImageModal(imageSrc) {

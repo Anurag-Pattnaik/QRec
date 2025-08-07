@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRec - Question Recorder</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="theme-toggle">
+        <button id="themeToggle" class="theme-toggle-btn" aria-label="Toggle theme">
+            <span class="theme-icon">🌙</span>
+        </button>
+    </div>
+
+    <div class="container">
+        <!-- Dashboard View -->
+        <div id="dashboard" class="dashboard">
+            <div class="dashboard-header">
+                <h1>Your Study Topics</h1>
+                <p class="text-secondary">Organize your study materials with interactive flash cards</p>
+            </div>
+
+            <div class="add-topic-section">
+                <button id="addTopicBtn" class="btn btn--primary btn--lg">
+                    ➕ Add New Topic
+                </button>
+            </div>
+
+            <div id="topicsGrid" class="topics-grid">
+                <!-- Topics will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Topic View -->
+        <div id="topicView" class="topic-view hidden">
+            <div class="topic-header">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <button id="backBtn" class="btn btn--secondary">← Back to Topics</button>
+                        <h2 id="topicTitle" class="topic-title">Topic Name</h2>
+                    </div>
+                    <button id="saveAllBtn" class="btn btn--primary">💾 Save All</button>
+                </div>
+            </div>
+
+            <!-- Enhanced Add Question Form -->
+            <div class="add-question-form card">
+                <div class="card__body">
+                    <h3>Create New Flash Card</h3>
+                    <form id="addQuestionForm">
+                        <div class="form-layout">
+                            <div class="form-group">
+                                <label class="form-label" for="questionNotes">Question Notes (Optional)</label>
+                                <textarea id="questionNotes" class="form-control" rows="3" placeholder="Enter your question or notes..."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="questionShorthand">Shorthand Identifier (Optional)</label>
+                                <input type="text" id="questionShorthand" class="form-control" placeholder="e.g., SQL Joins, Binary Trees...">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="questionImage">Image (Optional)</label>
+                                <input type="file" id="questionImage" class="form-control" accept="image/*">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Audio Recording (Optional)</label>
+                                <div class="audio-controls">
+                                    <button type="button" id="recordBtn" class="btn btn--secondary btn--sm">🎤 Record</button>
+                                    <button type="button" id="stopBtn" class="btn btn--secondary btn--sm" disabled>⏹ Stop</button>
+                                    <button type="button" id="playBtn" class="btn btn--secondary btn--sm" disabled>▶ Play</button>
+                                    <button type="button" id="clearAudioBtn" class="btn btn--outline btn--sm" disabled>🗑 Clear</button>
+                                    <span id="recordingStatus" class="recording-status"></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <button type="submit" class="btn btn--primary btn--full-width">Add Flash Card</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Enhanced Flash Cards Grid -->
+            <div id="flashCardsGrid" class="flash-cards-grid">
+                <!-- Flash cards will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Topic Modal -->
+    <div id="addTopicModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Topic</h3>
+                <button class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="addTopicForm">
+                    <div class="form-group">
+                        <label class="form-label" for="topicName">Topic Name</label>
+                        <input type="text" id="topicName" class="form-control" required placeholder="Enter topic name...">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="cancelAddTopic" class="btn btn--secondary">Cancel</button>
+                        <button type="submit" class="btn btn--primary">Create Topic</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Question Modal -->
+    <div id="editQuestionModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Flash Card</h3>
+                <button class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="editQuestionForm">
+                    <div class="form-group">
+                        <label class="form-label" for="editQuestionNotes">Question Notes (Optional)</label>
+                        <textarea id="editQuestionNotes" class="form-control" rows="4"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="editQuestionShorthand">Shorthand Identifier (Optional)</label>
+                        <input type="text" id="editQuestionShorthand" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="editQuestionImage">Update Image (Optional)</label>
+                        <input type="file" id="editQuestionImage" class="form-control" accept="image/*">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Audio Recording (Optional)</label>
+                        <div class="audio-controls">
+                            <button type="button" id="editRecordBtn" class="btn btn--secondary btn--sm">🎤 Record New</button>
+                            <button type="button" id="editStopBtn" class="btn btn--secondary btn--sm" disabled>⏹ Stop</button>
+                            <button type="button" id="editPlayBtn" class="btn btn--secondary btn--sm" disabled>▶ Play</button>
+                            <button type="button" id="editClearAudioBtn" class="btn btn--outline btn--sm" disabled>🗑 Clear Audio</button>
+                            <span id="editRecordingStatus" class="recording-status"></span>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" id="cancelEditQuestion" class="btn btn--secondary">Cancel</button>
+                        <button type="submit" class="btn btn--primary">Update Flash Card</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal hidden">
+        <div class="modal-image">
+            <button class="modal-close">×</button>
+            <img id="modalImage" src="" alt="Question Image">
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="loading-indicator hidden">
+        <div class="loading-spinner"></div>
+        <span>Processing...</span>
+    </div>
+
+    <!-- Success Notification -->
+    <div id="successNotification" class="notification notification--success hidden">
+        <span>Action completed successfully!</span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
